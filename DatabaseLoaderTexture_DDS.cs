@@ -95,6 +95,7 @@ namespace DDSLoader
                 byte[] dds_pxlf_dwFourCC = reader.ReadBytes(4);
                 string fourCC = Encoding.ASCII.GetString(dds_pxlf_dwFourCC);
                 int dds_pxlf_dwRGBBitCount = (int)reader.ReadUInt32();
+                int pixelSize = dds_pxlf_dwRGBBitCount / 8;
                 int dds_pxlf_dwRBitMask = (int)reader.ReadUInt32();
                 int dds_pxlf_dwGBitMask = (int)reader.ReadUInt32();
                 int dds_pxlf_dwBBitMask = (int)reader.ReadUInt32();
@@ -149,13 +150,13 @@ namespace DDSLoader
 
                     for (int i = 0; i < dwMipMapCount; ++i)
                     {
-                        int mipmapPitch = ((mipmapWidth * dds_pxlf_dwRGBBitCount + 3) / 4) * 4;
+                        int mipmapPitch = ((mipmapWidth * pixelSize + 3) / 4) * 4;
 
                         for (int y = 0; y < mipmapHeight; ++y, lineStart += mipmapPitch)
                         {
                             int pos = lineStart;
 
-                            for (int x = 0; x < mipmapWidth; ++x, pos += dds_pxlf_dwRGBBitCount)
+                            for (int x = 0; x < mipmapWidth; ++x, pos += pixelSize)
                             {
                                 byte r = dxtBytes[pos + 0];
                                 byte b = dxtBytes[pos + 2];
