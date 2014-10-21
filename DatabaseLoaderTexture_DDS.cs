@@ -173,7 +173,7 @@ namespace DDSLoader
 
                 Texture2D texture = new Texture2D(dwWidth, dwHeight, textureFormat, dwMipMapCount > 1);
                 texture.LoadRawTextureData(dxtBytes);
-                texture.Apply();
+                texture.Apply(false, true);
                 return texture;
             }
         }
