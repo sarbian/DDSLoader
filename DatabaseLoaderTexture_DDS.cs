@@ -150,7 +150,7 @@ namespace DDSLoader
 
                     for (int i = 0; i < dwMipMapCount; ++i)
                     {
-                        int mipmapPitch = ((mipmapWidth * pixelSize + 3) / 4) * 4;
+                        int mipmapPitch = mipmapWidth * pixelSize;
 
                         for (int y = 0; y < mipmapHeight; ++y, lineStart += mipmapPitch)
                         {
@@ -158,11 +158,11 @@ namespace DDSLoader
 
                             for (int x = 0; x < mipmapWidth; ++x, pos += pixelSize)
                             {
-                                byte r = dxtBytes[pos + 0];
-                                byte b = dxtBytes[pos + 2];
+                                byte b = dxtBytes[pos + 0];
+                                byte r = dxtBytes[pos + 2];
 
-                                dxtBytes[pos + 0] = b;
-                                dxtBytes[pos + 2] = r;
+                                dxtBytes[pos + 0] = r;
+                                dxtBytes[pos + 2] = b;
                             }
                         }
 
