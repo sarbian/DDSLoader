@@ -10,33 +10,22 @@ namespace DDSLoader
     [DatabaseLoaderAttrib(new[] {"dds"})]
     public class DatabaseLoaderTexture_DDS : DatabaseLoader<GameDatabase.TextureInfo>
     {
-        private const int DDSD_MIPMAPCOUNT_BIT = 0x00020000;
-        private const int DDPF_ALPHAPIXELS = 0x00000001;
-        private const int DDPF_FOURCC = 0x00000004;
-        private const int DDPF_RGB = 0x00000040;
+        private const uint DDSD_MIPMAPCOUNT_BIT = 0x00020000;
+        private const uint DDPF_ALPHAPIXELS = 0x00000001;
+        private const uint DDPF_FOURCC = 0x00000004;
+        private const uint DDPF_RGB = 0x00000040;
+        private const uint DDPF_NORMAL = 0x80000000;
 
         private static string error;
-        private static bool isCompressed;
 
         public override IEnumerator Load(UrlDir.UrlFile urlFile, FileInfo file)
         {
-            Texture2D texture = LoadDDS(file.FullName);
+            obj = LoadDDS(urlFile);
+            successful = obj != null;
 
-            if (texture == null)
-            {
-                Debug.LogWarning("DDSLoader Texture load error with '" + file.FullName + "': " + error);
-                successful = false;
-                obj = null;
-            }
-            else
-            {
-                // This assume the loaded normal texture is already in the right format
-                bool isNormalMap = Path.GetFileNameWithoutExtension(file.Name).EndsWith("NRM");
-                GameDatabase.TextureInfo textureInfo = new GameDatabase.TextureInfo(texture, isNormalMap, false,
-                    isCompressed);
-                obj = textureInfo;
-                successful = true;
-            }
+            if (!successful)
+                Debug.LogWarning("DDSLoader Texture load error with '" + urlFile.url + "': " + error);
+
             yield return null;
         }
 
@@ -44,14 +33,14 @@ namespace DDSLoader
         // http://answers.unity3d.com/questions/555984/can-you-load-dds-textures-during-runtime.html#answer-707772
         // http://msdn.microsoft.com/en-us/library/bb943992.aspx
         // http://msdn.microsoft.com/en-us/library/windows/desktop/bb205578(v=vs.85).aspx
-        public static Texture2D LoadDDS(string filename)
+        public static GameDatabase.TextureInfo LoadDDS(UrlDir.UrlFile urlFile)
         {
-            if (!File.Exists(filename))
+            if (!File.Exists(urlFile.fullPath))
             {
                 error = "File does not exist";
                 return null;
             }
-            using (BinaryReader reader = new BinaryReader(File.Open(filename, FileMode.Open, FileAccess.Read)))
+            using (BinaryReader reader = new BinaryReader(File.Open(urlFile.fullPath, FileMode.Open, FileAccess.Read)))
             {
                 byte[] dwMagic = reader.ReadBytes(4);
 
@@ -110,7 +99,8 @@ namespace DDSLoader
                 long dxtBytesLength = reader.BaseStream.Length - 128;
 
                 TextureFormat textureFormat = TextureFormat.ARGB32;
-                isCompressed = false;
+                bool isCompressed = false;
+                bool isNormalMap = (dds_pxlf_dwFlags & DDPF_NORMAL) != 0 || urlFile.name.EndsWith("NRM");
 
                 if ((dds_pxlf_dwFlags & DDPF_FOURCC) != 0)
                 {
@@ -174,7 +164,8 @@ namespace DDSLoader
                 Texture2D texture = new Texture2D(dwWidth, dwHeight, textureFormat, dwMipMapCount > 1);
                 texture.LoadRawTextureData(dxtBytes);
                 texture.Apply(false, true);
-                return texture;
+
+                return new GameDatabase.TextureInfo(texture, isNormalMap, false, isCompressed);
             }
         }
 
