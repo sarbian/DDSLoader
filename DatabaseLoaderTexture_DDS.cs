@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace DDSLoader
 {
-    [DatabaseLoaderAttrib(new[] {"dds"})]
+    [DatabaseLoaderAttrib(new[] { "dds" })]
     public class DatabaseLoaderTexture_DDS : DatabaseLoader<GameDatabase.TextureInfo>
     {
         private const uint DDSD_MIPMAPCOUNT_BIT = 0x00020000;
@@ -96,8 +96,6 @@ namespace DDSLoader
                 int dwCaps4 = (int)reader.ReadUInt32();
                 int dwReserved2 = (int)reader.ReadUInt32();
 
-                long dxtBytesLength = reader.BaseStream.Length - 128;
-
                 TextureFormat textureFormat = TextureFormat.ARGB32;
                 bool isCompressed = false;
                 bool isNormalMap = (dds_pxlf_dwFlags & DDPF_NORMAL) != 0 || urlFile.name.EndsWith("NRM");
@@ -129,35 +127,39 @@ namespace DDSLoader
                     return null;
                 }
 
+                long dataBias = 128;
+
+                if (Settings.MipmapBias != 0 || Settings.NormalMipmapBias != 0)
+                {
+                    int bias = isNormalMap ? Settings.NormalMipmapBias : Settings.MipmapBias;
+                    int blockSize = textureFormat == TextureFormat.DXT1 ? 8 : 16;
+                    int levels = Math.Min(bias, dwMipMapCount - 1);
+
+                    for (int i = 0; i < levels; ++i)
+                    {
+                        dataBias += isCompressed
+                            ? ((dwWidth + 3) / 4) * ((dwHeight + 3) / 4) * blockSize
+                            : dwWidth * dwHeight * pixelSize;
+
+                        dwWidth = Math.Max(1, dwWidth / 2);
+                        dwHeight = Math.Max(1, dwHeight / 2);
+                    }
+                }
+
+                long dxtBytesLength = reader.BaseStream.Length - dataBias;
+                reader.BaseStream.Seek(dataBias, SeekOrigin.Begin);
                 byte[] dxtBytes = reader.ReadBytes((int)dxtBytesLength);
 
                 // Swap red and blue.
                 if (!isCompressed)
                 {
-                    int mipmapWidth = dwWidth;
-                    int mipmapHeight = dwHeight;
-                    int lineStart = 0;
-
-                    for (int i = 0; i < dwMipMapCount; ++i)
+                    for (int i = 0; i < dxtBytes.Length; i += pixelSize)
                     {
-                        int mipmapPitch = mipmapWidth * pixelSize;
+                        byte b = dxtBytes[i + 0];
+                        byte r = dxtBytes[i + 2];
 
-                        for (int y = 0; y < mipmapHeight; ++y, lineStart += mipmapPitch)
-                        {
-                            int pos = lineStart;
-
-                            for (int x = 0; x < mipmapWidth; ++x, pos += pixelSize)
-                            {
-                                byte b = dxtBytes[pos + 0];
-                                byte r = dxtBytes[pos + 2];
-
-                                dxtBytes[pos + 0] = r;
-                                dxtBytes[pos + 2] = b;
-                            }
-                        }
-
-                        mipmapWidth = Math.Max(1, mipmapWidth / 2);
-                        mipmapHeight = Math.Max(1, mipmapHeight / 2);
+                        dxtBytes[i + 0] = r;
+                        dxtBytes[i + 2] = b;
                     }
                 }
 
