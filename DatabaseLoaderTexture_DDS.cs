@@ -23,8 +23,8 @@ namespace DDSLoader
 
         public override IEnumerator Load(UrlDir.UrlFile urlFile, FileInfo file)
         {
-            bool asNormal = urlFile.name.EndsWith("NRM");
-            bool keepReadable = urlFile.name.EndsWith("READ");
+            bool asNormal = urlFile.name.EndsWith("NRM") || Settings.isNormal(urlFile.url);
+            bool keepReadable = urlFile.name.EndsWith("READ") || Settings.keepReadable(urlFile.url);
 
             obj = LoadDDS(urlFile.fullPath, keepReadable, asNormal);
             successful = obj != null;
