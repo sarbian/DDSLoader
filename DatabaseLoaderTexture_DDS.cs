@@ -12,15 +12,21 @@ namespace DDSLoader
     {
         private const uint DDSD_MIPMAPCOUNT_BIT = 0x00020000;
         private const uint DDPF_ALPHAPIXELS = 0x00000001;
+        private const uint DDPF_ALPHA = 0x00000002;
         private const uint DDPF_FOURCC = 0x00000004;
         private const uint DDPF_RGB = 0x00000040;
+        private const uint DDPF_YUV = 0x00000200;
+        private const uint DDPF_LUMINANCE = 0x00020000;
         private const uint DDPF_NORMAL = 0x80000000;
 
         private static string error;
 
         public override IEnumerator Load(UrlDir.UrlFile urlFile, FileInfo file)
         {
-            obj = LoadDDS(urlFile);
+            bool asNormal = urlFile.name.EndsWith("NRM");
+            bool keepReadable = urlFile.name.EndsWith("READ");
+
+            obj = LoadDDS(urlFile.fullPath, keepReadable, asNormal);
             successful = obj != null;
 
             if (!successful)
@@ -33,14 +39,15 @@ namespace DDSLoader
         // http://answers.unity3d.com/questions/555984/can-you-load-dds-textures-during-runtime.html#answer-707772
         // http://msdn.microsoft.com/en-us/library/bb943992.aspx
         // http://msdn.microsoft.com/en-us/library/windows/desktop/bb205578(v=vs.85).aspx
-        public static GameDatabase.TextureInfo LoadDDS(UrlDir.UrlFile urlFile)
+        // mipmapBias limits the number of mipmap when > 0
+        public static GameDatabase.TextureInfo LoadDDS(string path, bool keepReadable = false, bool asNormal = false, int mipmapBias = -1)
         {
-            if (!File.Exists(urlFile.fullPath))
+            if (!File.Exists(path))
             {
                 error = "File does not exist";
                 return null;
             }
-            using (BinaryReader reader = new BinaryReader(File.Open(urlFile.fullPath, FileMode.Open, FileAccess.Read)))
+            using (BinaryReader reader = new BinaryReader(File.Open(path, FileMode.Open, FileAccess.Read)))
             {
                 byte[] dwMagic = reader.ReadBytes(4);
 
@@ -79,16 +86,16 @@ namespace DDSLoader
                 }
 
                 // DDS_PIXELFORMAT
-                int dds_pxlf_dwSize = (int)reader.ReadUInt32();
-                int dds_pxlf_dwFlags = (int)reader.ReadUInt32();
+                uint dds_pxlf_dwSize = reader.ReadUInt32();
+                uint dds_pxlf_dwFlags = reader.ReadUInt32();
                 byte[] dds_pxlf_dwFourCC = reader.ReadBytes(4);
                 string fourCC = Encoding.ASCII.GetString(dds_pxlf_dwFourCC);
-                int dds_pxlf_dwRGBBitCount = (int)reader.ReadUInt32();
-                int pixelSize = dds_pxlf_dwRGBBitCount / 8;
-                int dds_pxlf_dwRBitMask = (int)reader.ReadUInt32();
-                int dds_pxlf_dwGBitMask = (int)reader.ReadUInt32();
-                int dds_pxlf_dwBBitMask = (int)reader.ReadUInt32();
-                int dds_pxlf_dwABitMask = (int)reader.ReadUInt32();
+                uint dds_pxlf_dwRGBBitCount = reader.ReadUInt32();
+                uint pixelSize = dds_pxlf_dwRGBBitCount / 8;
+                uint dds_pxlf_dwRBitMask = reader.ReadUInt32();
+                uint dds_pxlf_dwGBitMask = reader.ReadUInt32();
+                uint dds_pxlf_dwBBitMask = reader.ReadUInt32();
+                uint dds_pxlf_dwABitMask = reader.ReadUInt32();
 
                 int dwCaps = (int)reader.ReadUInt32();
                 int dwCaps2 = (int)reader.ReadUInt32();
@@ -98,32 +105,61 @@ namespace DDSLoader
 
                 TextureFormat textureFormat = TextureFormat.ARGB32;
                 bool isCompressed = false;
-                bool isNormalMap = (dds_pxlf_dwFlags & DDPF_NORMAL) != 0 || urlFile.name.EndsWith("NRM");
+                bool isNormalMap = (dds_pxlf_dwFlags & DDPF_NORMAL) != 0 || asNormal;
 
-                if ((dds_pxlf_dwFlags & DDPF_FOURCC) != 0)
+                bool alpha = (dds_pxlf_dwFlags & DDPF_ALPHA) != 0;
+                bool fourcc = (dds_pxlf_dwFlags & DDPF_FOURCC) != 0;
+                bool rgb = (dds_pxlf_dwFlags & DDPF_RGB) != 0;
+                bool alphapixel = (dds_pxlf_dwFlags & DDPF_ALPHAPIXELS) != 0;
+                bool luminance = (dds_pxlf_dwFlags & DDPF_LUMINANCE) != 0;
+                bool rgb888 = dds_pxlf_dwRBitMask == 0x000000ff && dds_pxlf_dwGBitMask == 0x0000ff00 && dds_pxlf_dwBBitMask == 0x00ff0000;
+                bool bgr888 = dds_pxlf_dwRBitMask == 0x00ff0000 && dds_pxlf_dwGBitMask == 0x0000ff00 && dds_pxlf_dwBBitMask == 0x000000ff;
+                bool rgb565 = dds_pxlf_dwRBitMask == 0x0000F800 && dds_pxlf_dwGBitMask == 0x000007E0 && dds_pxlf_dwBBitMask == 0x0000001F;
+                bool argb4444 = dds_pxlf_dwABitMask == 0x0000f000 && dds_pxlf_dwRBitMask == 0x00000f00 && dds_pxlf_dwGBitMask == 0x000000f0 && dds_pxlf_dwBBitMask == 0x0000000f;
+                bool rbga4444 = dds_pxlf_dwABitMask == 0x0000000f && dds_pxlf_dwRBitMask == 0x0000f000 && dds_pxlf_dwGBitMask == 0x000000f0 && dds_pxlf_dwBBitMask == 0x00000f00;
+                if (fourcc)
                 {
                     // Texture dos not contain RGB data, check FourCC for format
                     isCompressed = true;
 
-                    if (fourCCEquals(dds_pxlf_dwFourCC, "DXT1"))
-                    {
-                        textureFormat = TextureFormat.DXT1;
-                    }
-                    else if (fourCCEquals(dds_pxlf_dwFourCC, "DXT5"))
-                    {
-                        textureFormat = TextureFormat.DXT5;
-                    }
+                if (fourCCEquals(dds_pxlf_dwFourCC, "DXT1"))
+                {
+                    textureFormat = TextureFormat.DXT1;
                 }
-                else if ((dds_pxlf_dwFlags & DDPF_RGB) != 0)
+                else if (fourCCEquals(dds_pxlf_dwFourCC, "DXT5"))
+                {
+                    textureFormat = TextureFormat.DXT5;
+                }
+                }
+                else if (rgb && (rgb888 || bgr888))
                 {
                     // RGB or RGBA format
-                    textureFormat = (dds_pxlf_dwFlags & DDPF_ALPHAPIXELS) != 0
+                    textureFormat = alphapixel
                         ? TextureFormat.RGBA32
                         : TextureFormat.RGB24;
                 }
+                else if (rgb && rgb565)
+                {
+                    // Nvidia texconv B5G6R5_UNORM
+                    textureFormat = TextureFormat.RGB565;
+                }
+                else if (rgb && alphapixel && argb4444)
+                {
+                    // Nvidia texconv B4G4R4A4_UNORM
+                    textureFormat = TextureFormat.ARGB4444;
+                }
+                else if (rgb && alphapixel && rbga4444)
+                {
+                    textureFormat = TextureFormat.RGBA4444;
+                }
+                else if (!rgb && alpha != luminance)
+                {
+                    // A8 format or Luminance 8
+                    textureFormat = TextureFormat.Alpha8;
+                }
                 else
                 {
-                    error = "Only DXT1, DXT5, RGB24 and RGBA32 are supported";
+                    error = "Only DXT1, DXT5, A8, RGB24, BGR24, RGBA32, BGBR32, RGB565, ARGB4444 and RGBA4444 are supported";
                     return null;
                 }
 
@@ -132,6 +168,8 @@ namespace DDSLoader
                 if (Settings.MipmapBias != 0 || Settings.NormalMipmapBias != 0)
                 {
                     int bias = isNormalMap ? Settings.NormalMipmapBias : Settings.MipmapBias;
+                    if (mipmapBias > 0)
+                        bias = mipmapBias;
                     int blockSize = textureFormat == TextureFormat.DXT1 ? 8 : 16;
                     int levels = Math.Min(bias, dwMipMapCount - 1);
 
@@ -151,9 +189,9 @@ namespace DDSLoader
                 byte[] dxtBytes = reader.ReadBytes((int)dxtBytesLength);
 
                 // Swap red and blue.
-                if (!isCompressed)
+                if (bgr888)
                 {
-                    for (int i = 0; i < dxtBytes.Length; i += pixelSize)
+                    for (uint i = 0; i < dxtBytes.Length; i += pixelSize)
                     {
                         byte b = dxtBytes[i + 0];
                         byte r = dxtBytes[i + 2];
@@ -165,9 +203,9 @@ namespace DDSLoader
 
                 Texture2D texture = new Texture2D(dwWidth, dwHeight, textureFormat, dwMipMapCount > 1);
                 texture.LoadRawTextureData(dxtBytes);
-                texture.Apply(false, true);
+                texture.Apply(false, !keepReadable);
 
-                return new GameDatabase.TextureInfo(texture, isNormalMap, false, isCompressed);
+                return new GameDatabase.TextureInfo(texture, isNormalMap, keepReadable, isCompressed);
             }
         }
 
