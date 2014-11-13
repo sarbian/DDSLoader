@@ -56,7 +56,6 @@ public class Settings : MonoBehaviour
                 {
                     Regex re = new Regex(texture.value, RegexOptions.None);
                     normalList.Add(re);
-                    Debug.Log("DDSLoader normal " + texture.value);
                 }
             }
 
@@ -69,7 +68,6 @@ public class Settings : MonoBehaviour
                     {
                         Regex re = new Regex(texture.name, RegexOptions.None);
                         readableList.Add(re);
-                        Debug.Log("DDSLoader readable " + texture.name);
                     }
                 }
             }
