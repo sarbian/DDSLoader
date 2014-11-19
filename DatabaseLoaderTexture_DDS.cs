@@ -189,7 +189,7 @@ namespace DDSLoader
                 byte[] dxtBytes = reader.ReadBytes((int)dxtBytesLength);
 
                 // Swap red and blue.
-                if (bgr888)
+                if (!isCompressed && bgr888)
                 {
                     for (uint i = 0; i < dxtBytes.Length; i += pixelSize)
                     {
