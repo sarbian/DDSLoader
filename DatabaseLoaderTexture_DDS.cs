@@ -40,7 +40,7 @@ namespace DDSLoader
         // http://msdn.microsoft.com/en-us/library/bb943992.aspx
         // http://msdn.microsoft.com/en-us/library/windows/desktop/bb205578(v=vs.85).aspx
         // mipmapBias limits the number of mipmap when > 0
-        public static GameDatabase.TextureInfo LoadDDS(string path, bool keepReadable = false, bool asNormal = false, int mipmapBias = -1)
+        public static GameDatabase.TextureInfo LoadDDS(string path, bool keepReadable = false, bool asNormal = false, int mipmapBias = -1, bool apply = true)
         {
             if (!File.Exists(path))
             {
@@ -203,7 +203,8 @@ namespace DDSLoader
 
                 Texture2D texture = new Texture2D(dwWidth, dwHeight, textureFormat, dwMipMapCount > 1);
                 texture.LoadRawTextureData(dxtBytes);
-                texture.Apply(false, !keepReadable);
+                if (apply)
+                    texture.Apply(false, !keepReadable);
 
                 return new GameDatabase.TextureInfo(texture, isNormalMap, keepReadable, isCompressed);
             }
