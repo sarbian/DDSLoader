@@ -61,13 +61,16 @@ public class Settings : MonoBehaviour
 
             foreach (ConfigNode overrides in config.GetNodes("OVERRIDES"))
             {
-                foreach (ConfigNode texture in overrides.nodes)
+                if (overrides.nodes != null)
                 {
-                    string readable = texture.GetValue("make_not_readable");
-                    if (readable != null && readable == "false")
+                    foreach (ConfigNode texture in overrides.nodes)
                     {
-                        Regex re = new Regex(texture.name, RegexOptions.None);
-                        readableList.Add(re);
+                        string readable = texture.GetValue("make_not_readable");
+                        if (readable != null && readable == "false")
+                        {
+                            Regex re = new Regex(texture.name, RegexOptions.None);
+                            readableList.Add(re);
+                        }
                     }
                 }
             }
