@@ -122,14 +122,14 @@ namespace DDSLoader
                     // Texture dos not contain RGB data, check FourCC for format
                     isCompressed = true;
 
-                if (fourCCEquals(dds_pxlf_dwFourCC, "DXT1"))
-                {
-                    textureFormat = TextureFormat.DXT1;
-                }
-                else if (fourCCEquals(dds_pxlf_dwFourCC, "DXT5"))
-                {
-                    textureFormat = TextureFormat.DXT5;
-                }
+                    if (fourCCEquals(dds_pxlf_dwFourCC, "DXT1"))
+                    {
+                        textureFormat = TextureFormat.DXT1;
+                    }
+                    else if (fourCCEquals(dds_pxlf_dwFourCC, "DXT5"))
+                    {
+                        textureFormat = TextureFormat.DXT5;
+                    }
                 }
                 else if (rgb && (rgb888 || bgr888))
                 {
@@ -201,10 +201,26 @@ namespace DDSLoader
                     }
                 }
 
+                //QualitySettings.masterTextureLimit = 0;
+                // Work around for an >Unity< Bug.
+                // if QualitySettings.masterTextureLimit != 0 (half or quarter texture rez)
+                // and dwWidth and dwHeight divided by 2 (or 4 for quarter rez) are not a multiple of 4 
+                // and we are creating a DXT5 or DXT1 texture
+                // Then you get an Unity error on the "new Texture"
+
+                int quality = QualitySettings.masterTextureLimit;
+
+                // If the bug conditions are present then switch to full quality
+                if (isCompressed && quality > 0 && (dwWidth >> quality) % 4 != 0 && (dwHeight >> quality) % 4 != 0)
+                    QualitySettings.masterTextureLimit = 0;
+
                 Texture2D texture = new Texture2D(dwWidth, dwHeight, textureFormat, dwMipMapCount > 1);
                 texture.LoadRawTextureData(dxtBytes);
                 if (apply)
                     texture.Apply(false, !keepReadable);
+
+                if (QualitySettings.masterTextureLimit != quality)
+                    QualitySettings.masterTextureLimit = quality;
 
                 return new GameDatabase.TextureInfo(texture, isNormalMap, keepReadable, isCompressed);
             }

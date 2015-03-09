@@ -33,5 +33,5 @@ using System.Runtime.InteropServices;
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.7.0.0")] // Don't change this one anymore
-[assembly: AssemblyFileVersion("1.8.0.0")]
+[assembly: AssemblyFileVersion("1.9.0.0")]
 [assembly: KSPAssembly("DDSLoader", 1, 0)] // Don't change this one either
